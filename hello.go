@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -11,6 +12,11 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 }
+
+var (
+	colonSpace = []byte(": ")
+	newline = []byte("\n")
+)
 
 var clients []websocket.Conn
 
@@ -22,7 +28,7 @@ func main() {
 
 		for {
 			// Read message from browser
-			msgType, msg, err := conn.ReadMessage()
+			_, msg, err := conn.ReadMessage()
 			if err != nil {
 				return
 			}
@@ -32,9 +38,20 @@ func main() {
 
 			for _, client := range clients {
 				// Write message back to browser
-				if err = client.WriteMessage(msgType, msg); err != nil {
+				var connectionAddr = []byte(conn.RemoteAddr().String())
+
+				w, err := client.NextWriter(websocket.TextMessage)
+				if err != nil {
 					return
 				}
+				w.Write(connectionAddr)
+				w.Write(colonSpace)
+				w.Write(msg)
+				w.Write(newline)
+				if err := w.Close(); err != nil {
+					return
+				}
+				client.SetWriteDeadline(time.Now().Add(2 * time.Second))
 			}
 
 		}
